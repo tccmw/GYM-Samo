@@ -15,7 +15,9 @@ const {
   SD_SCHUL_CODE,
   COMMAND_PREFIX = '!',
   DEFAULT_MEAL = '\uC911\uC2DD',
-  SCHEDULE_CRON = '0 8 * * 1-5',
+  BREAKFAST_CRON = '0 7 * * 1-5',
+  LUNCH_CRON = '0 12 * * 1-5',
+  DINNER_CRON = '0 17 * * 1-5',
   TIMEZONE = 'Asia/Seoul',
 } = process.env;
 
@@ -29,6 +31,12 @@ const MEAL_CODES = {
 };
 
 const ALL_MEALS = ['\uC870\uC2DD', '\uC911\uC2DD', '\uC11D\uC2DD'];
+
+const SCHEDULED_MEALS = [
+  { mealName: '\uC870\uC2DD', cron: BREAKFAST_CRON },
+  { mealName: '\uC911\uC2DD', cron: LUNCH_CRON },
+  { mealName: '\uC11D\uC2DD', cron: DINNER_CRON },
+];
 
 if (!DISCORD_TOKEN) {
   throw new Error('DISCORD_TOKEN is required. Check your .env file.');
@@ -55,34 +63,40 @@ client.once('ready', () => {
     return;
   }
 
-  if (!cron.validate(SCHEDULE_CRON)) {
-    console.warn(`Invalid SCHEDULE_CRON: ${SCHEDULE_CRON}. Scheduled meal posting is disabled.`);
-    return;
+  for (const scheduledMeal of SCHEDULED_MEALS) {
+    if (!cron.validate(scheduledMeal.cron)) {
+      console.warn(`Invalid cron for ${scheduledMeal.mealName}: ${scheduledMeal.cron}. This meal schedule is disabled.`);
+      continue;
+    }
+
+    cron.schedule(
+      scheduledMeal.cron,
+      async () => {
+        try {
+          const channel = await client.channels.fetch(DISCORD_CHANNEL_ID);
+          if (!channel?.isTextBased()) {
+            console.warn(`Channel ${DISCORD_CHANNEL_ID} is not a text channel.`);
+            return;
+          }
+
+          const meal = await getMealMessage({
+            date: new Date(),
+            mealName: scheduledMeal.mealName,
+          });
+          await channel.send(meal);
+        } catch (error) {
+          console.error(`Failed to post scheduled ${scheduledMeal.mealName}:`, error);
+        }
+      },
+      { timezone: TIMEZONE },
+    );
+
+    console.log(`Scheduled ${scheduledMeal.mealName}: "${scheduledMeal.cron}" (${TIMEZONE})`);
   }
 
-  cron.schedule(
-    SCHEDULE_CRON,
-    async () => {
-      try {
-        const channel = await client.channels.fetch(DISCORD_CHANNEL_ID);
-        if (!channel?.isTextBased()) {
-          console.warn(`Channel ${DISCORD_CHANNEL_ID} is not a text channel.`);
-          return;
-        }
-
-        const meal = await getMealMessage({
-          date: new Date(),
-          mealName: DEFAULT_MEAL,
-        });
-        await channel.send(meal);
-      } catch (error) {
-        console.error('Failed to post scheduled meal:', error);
-      }
-    },
-    { timezone: TIMEZONE },
-  );
-
-  console.log(`Scheduled meal posting: "${SCHEDULE_CRON}" (${TIMEZONE})`);
+  if (SCHEDULED_MEALS.every((scheduledMeal) => !cron.validate(scheduledMeal.cron))) {
+    console.warn('All scheduled meal cron values are invalid. Scheduled meal posting is disabled.');
+  }
 });
 
 client.on('messageCreate', async (message) => {
