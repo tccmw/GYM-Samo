@@ -1,0 +1,19 @@
+{
+  "name": "gym-samo-meal-bot",
+  "version": "1.0.0",
+  "description": "Discord bot that posts Korean school meals and protein information from NEIS.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "check": "node --check src/index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "node-cron": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
