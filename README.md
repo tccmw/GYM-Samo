@@ -51,3 +51,7 @@ npm start
 슬래시 명령어 `/급식`을 바로 보이게 하려면 `.env`에 `DISCORD_GUILD_ID`를 넣어주세요. 봇 초대 URL을 만들 때 `applications.commands` 스코프도 같이 체크해야 합니다.
 
 봇 권한은 `채널 보기`, `메시지 보내기`, `메시지 기록 보기`, `링크 임베드`를 허용해주세요.
+
+## Railway 배포
+
+24시간 실행은 Railway 배포를 권장합니다. 자세한 절차는 [RAILWAY.md](RAILWAY.md)를 참고하세요.
