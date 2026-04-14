@@ -24,6 +24,7 @@ npm install
 ```env
 DISCORD_TOKEN=디스코드_봇_토큰
 DISCORD_CHANNEL_ID=정기알림을_보낼_채널_ID
+DISCORD_GUILD_ID=슬래시명령어를_등록할_서버_ID
 
 NEIS_API_KEY=
 ATPT_OFCDC_SC_CODE=교육청코드
@@ -46,3 +47,5 @@ npm start
 ```
 
 디스코드 개발자 포털에서 봇의 `MESSAGE CONTENT INTENT`를 켜야 `!급식` 같은 일반 메시지 명령을 읽을 수 있습니다.
+
+슬래시 명령어 `/급식`을 바로 보이게 하려면 `.env`에 `DISCORD_GUILD_ID`를 넣어주세요. 봇 초대 URL을 만들 때 `applications.commands` 스코프도 같이 체크해야 합니다.
