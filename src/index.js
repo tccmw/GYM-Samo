@@ -3,6 +3,7 @@ import 'dotenv/config';
 import cron from 'node-cron';
 import {
   Client,
+  EmbedBuilder,
   Events,
   GatewayIntentBits,
   Partials,
@@ -34,6 +35,12 @@ const MEAL_CODES = {
 };
 
 const ALL_MEALS = ['\uC870\uC2DD', '\uC911\uC2DD', '\uC11D\uC2DD'];
+
+const MEAL_META = {
+  '\uC870\uC2DD': { icon: '\uD83C\uDF05', color: 0xf59e0b },
+  '\uC911\uC2DD': { icon: '\uD83C\uDF31', color: 0x22c55e },
+  '\uC11D\uC2DD': { icon: '\uD83C\uDF19', color: 0x6366f1 },
+};
 
 const SCHEDULED_MEALS = [
   { mealName: '\uC870\uC2DD', cron: BREAKFAST_CRON },
@@ -103,7 +110,7 @@ client.once(Events.ClientReady, async () => {
             return;
           }
 
-          const meal = await getMealMessage({
+          const meal = await getMealResponse({
             date: new Date(),
             mealName: scheduledMeal.mealName,
           });
@@ -133,8 +140,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const dateInput = interaction.options.getString('date');
     const date = parseDateInput(dateInput);
     const reply = mealName
-      ? await getMealMessage({ date, mealName })
-      : await getDailyMealMessage({ date });
+      ? await getMealResponse({ date, mealName })
+      : await getDailyMealResponse({ date });
 
     await interaction.reply(reply);
   } catch (error) {
@@ -163,8 +170,8 @@ client.on('messageCreate', async (message) => {
   try {
     const { mealName, date } = parseMealArgs(args);
     const reply = mealName
-      ? await getMealMessage({ date, mealName })
-      : await getDailyMealMessage({ date });
+      ? await getMealResponse({ date, mealName })
+      : await getDailyMealResponse({ date });
     await message.reply(reply);
   } catch (error) {
     console.error('Failed to handle meal command:', error);
@@ -240,22 +247,30 @@ function parseDateInput(value) {
   return parseDate(normalized) ?? new Date();
 }
 
-async function getDailyMealMessage({ date }) {
-  const messages = await Promise.all(
-    ALL_MEALS.map((mealName) => getMealMessage({ date, mealName })),
+async function getDailyMealResponse({ date }) {
+  const embeds = await Promise.all(
+    ALL_MEALS.map((mealName) => getMealEmbed({ date, mealName })),
   );
 
-  return messages.join('\n\n');
+  return { embeds };
 }
 
-async function getMealMessage({ date, mealName }) {
+async function getMealResponse({ date, mealName }) {
+  return { embeds: [await getMealEmbed({ date, mealName })] };
+}
+
+async function getMealEmbed({ date, mealName }) {
   const meal = await fetchMeal({
     dateYmd: formatYmd(date),
     mealCode: MEAL_CODES[mealName] ?? MEAL_CODES[DEFAULT_MEAL] ?? '2',
   });
+  const meta = MEAL_META[mealName] ?? { icon: '\uD83C\uDF7D\uFE0F', color: 0x38bdf8 };
 
   if (!meal) {
-    return `**${formatKoreanDate(date)} ${mealName}**\n- \uAE09\uC2DD \uC815\uBCF4\uAC00 \uC5C6\uC5B4\uC694.`;
+    return new EmbedBuilder()
+      .setColor(0x94a3b8)
+      .setTitle(`${meta.icon} ${formatKoreanDate(date)} ${mealName}`)
+      .setDescription('\uAE09\uC2DD \uC815\uBCF4\uAC00 \uC5C6\uC5B4\uC694.');
   }
 
   const dishes = cleanDishNames(meal.DDISH_NM);
@@ -263,14 +278,28 @@ async function getMealMessage({ date, mealName }) {
   const protein = nutrition.get('\uB2E8\uBC31\uC9C8(g)') ?? '\uC815\uBCF4 \uC5C6\uC74C';
   const calories = meal.CAL_INFO ?? '\uC815\uBCF4 \uC5C6\uC74C';
 
-  return [
-    `**${meal.SCHUL_NM ?? '\uD559\uAD50'} ${formatKoreanDate(date)} ${meal.MMEAL_SC_NM ?? mealName}**`,
-    '',
-    dishes.length > 0 ? dishes.map((dish) => `- ${dish}`).join('\n') : '- \uBA54\uB274 \uC815\uBCF4 \uC5C6\uC74C',
-    '',
-    `\uB2E8\uBC31\uC9C8: **${protein}**`,
-    `\uCE7C\uB85C\uB9AC: ${calories}`,
-  ].join('\n');
+  return new EmbedBuilder()
+    .setColor(meta.color)
+    .setTitle(`${meta.icon} ${meal.SCHUL_NM ?? '\uD559\uAD50'} ${meal.MMEAL_SC_NM ?? mealName}`)
+    .setDescription(formatKoreanDate(date))
+    .addFields(
+      {
+        name: '\uD83C\uDF7D\uFE0F \uBA54\uB274',
+        value: dishes.length > 0 ? dishes.map((dish) => `• ${dish}`).join('\n') : '\uBA54\uB274 \uC815\uBCF4 \uC5C6\uC74C',
+      },
+      {
+        name: '\uD83D\uDCAA \uB2E8\uBC31\uC9C8',
+        value: `**${protein}**`,
+        inline: true,
+      },
+      {
+        name: '\uD83D\uDD25 \uCE7C\uB85C\uB9AC',
+        value: calories,
+        inline: true,
+      },
+    )
+    .setFooter({ text: 'NEIS \uAE09\uC2DD \uC815\uBCF4' })
+    .setTimestamp();
 }
 
 async function fetchMeal({ dateYmd, mealCode }) {
