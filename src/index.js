@@ -14,19 +14,21 @@ const {
   ATPT_OFCDC_SC_CODE,
   SD_SCHUL_CODE,
   COMMAND_PREFIX = '!',
-  DEFAULT_MEAL = '중식',
+  DEFAULT_MEAL = '\uC911\uC2DD',
   SCHEDULE_CRON = '0 8 * * 1-5',
   TIMEZONE = 'Asia/Seoul',
 } = process.env;
 
 const MEAL_CODES = {
-  조식: '1',
-  아침: '1',
-  중식: '2',
-  점심: '2',
-  석식: '3',
-  저녁: '3',
+  '\uC870\uC2DD': '1',
+  '\uC544\uCE68': '1',
+  '\uC911\uC2DD': '2',
+  '\uC810\uC2EC': '2',
+  '\uC11D\uC2DD': '3',
+  '\uC800\uB141': '3',
 };
+
+const ALL_MEALS = ['\uC870\uC2DD', '\uC911\uC2DD', '\uC11D\uC2DD'];
 
 if (!DISCORD_TOKEN) {
   throw new Error('DISCORD_TOKEN is required. Check your .env file.');
@@ -93,21 +95,23 @@ client.on('messageCreate', async (message) => {
     .trim()
     .split(/\s+/);
 
-  if (command !== '급식') {
+  if (command !== '\uAE09\uC2DD') {
     return;
   }
 
   try {
     const { mealName, date } = parseMealArgs(args);
-    const reply = await getMealMessage({ date, mealName });
+    const reply = mealName
+      ? await getMealMessage({ date, mealName })
+      : await getDailyMealMessage({ date });
     await message.reply(reply);
   } catch (error) {
     console.error('Failed to handle meal command:', error);
 
     const fallback =
       error.code === 50013
-        ? '권한이 부족해서 급식 정보를 보낼 수 없어요. 채널 전송 권한을 확인해주세요.'
-        : `급식 정보를 가져오지 못했어요.\n${error.message}`;
+        ? '\uAD8C\uD55C\uC774 \uBD80\uC871\uD574\uC11C \uAE09\uC2DD \uC815\uBCF4\uB97C \uBCF4\uB0BC \uC218 \uC5C6\uC5B4\uC694. \uCC44\uB110 \uC804\uC1A1 \uAD8C\uD55C\uC744 \uD655\uC778\uD574\uC8FC\uC138\uC694.'
+        : `\uAE09\uC2DD \uC815\uBCF4\uB97C \uAC00\uC838\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694.\n${error.message}`;
 
     await message.reply(fallback);
   }
@@ -116,7 +120,7 @@ client.on('messageCreate', async (message) => {
 await client.login(DISCORD_TOKEN);
 
 function parseMealArgs(args) {
-  let mealName = DEFAULT_MEAL;
+  let mealName = null;
   let date = new Date();
 
   for (const arg of args) {
@@ -127,12 +131,12 @@ function parseMealArgs(args) {
       continue;
     }
 
-    if (normalized === '오늘') {
+    if (normalized === '\uC624\uB298') {
       date = new Date();
       continue;
     }
 
-    if (normalized === '내일') {
+    if (normalized === '\uB0B4\uC77C') {
       date = addDays(new Date(), 1);
       continue;
     }
@@ -146,6 +150,14 @@ function parseMealArgs(args) {
   return { mealName, date };
 }
 
+async function getDailyMealMessage({ date }) {
+  const messages = await Promise.all(
+    ALL_MEALS.map((mealName) => getMealMessage({ date, mealName })),
+  );
+
+  return messages.join('\n\n');
+}
+
 async function getMealMessage({ date, mealName }) {
   const meal = await fetchMeal({
     dateYmd: formatYmd(date),
@@ -153,21 +165,21 @@ async function getMealMessage({ date, mealName }) {
   });
 
   if (!meal) {
-    return `${formatKoreanDate(date)} ${mealName} 급식 정보가 없어요.`;
+    return `**${formatKoreanDate(date)} ${mealName}**\n- \uAE09\uC2DD \uC815\uBCF4\uAC00 \uC5C6\uC5B4\uC694.`;
   }
 
   const dishes = cleanDishNames(meal.DDISH_NM);
   const nutrition = parseNutrition(meal.NTR_INFO);
-  const protein = nutrition.get('단백질(g)') ?? '정보 없음';
-  const calories = meal.CAL_INFO ?? '정보 없음';
+  const protein = nutrition.get('\uB2E8\uBC31\uC9C8(g)') ?? '\uC815\uBCF4 \uC5C6\uC74C';
+  const calories = meal.CAL_INFO ?? '\uC815\uBCF4 \uC5C6\uC74C';
 
   return [
-    `**${meal.SCHUL_NM ?? '학교'} ${formatKoreanDate(date)} ${meal.MMEAL_SC_NM ?? mealName}**`,
+    `**${meal.SCHUL_NM ?? '\uD559\uAD50'} ${formatKoreanDate(date)} ${meal.MMEAL_SC_NM ?? mealName}**`,
     '',
-    dishes.length > 0 ? dishes.map((dish) => `- ${dish}`).join('\n') : '- 메뉴 정보 없음',
+    dishes.length > 0 ? dishes.map((dish) => `- ${dish}`).join('\n') : '- \uBA54\uB274 \uC815\uBCF4 \uC5C6\uC74C',
     '',
-    `단백질: **${protein}**`,
-    `칼로리: ${calories}`,
+    `\uB2E8\uBC31\uC9C8: **${protein}**`,
+    `\uCE7C\uB85C\uB9AC: ${calories}`,
   ].join('\n');
 }
 
@@ -189,7 +201,7 @@ async function fetchMeal({ dateYmd, mealCode }) {
   const response = await fetch(`https://open.neis.go.kr/hub/mealServiceDietInfo?${params}`);
 
   if (!response.ok) {
-    throw new Error(`NEIS API 요청 실패: HTTP ${response.status}`);
+    throw new Error(`NEIS API \uC694\uCCAD \uC2E4\uD328: HTTP ${response.status}`);
   }
 
   const data = await response.json();
@@ -200,7 +212,7 @@ async function fetchMeal({ dateYmd, mealCode }) {
 
   const result = data.mealServiceDietInfo?.[0]?.head?.[1]?.RESULT ?? data.RESULT;
   if (result && !['INFO-000', 'INFO-200'].includes(result.CODE)) {
-    throw new Error(`NEIS API 오류: ${result.MESSAGE ?? result.CODE}`);
+    throw new Error(`NEIS API \uC624\uB958: ${result.MESSAGE ?? result.CODE}`);
   }
 
   return null;
